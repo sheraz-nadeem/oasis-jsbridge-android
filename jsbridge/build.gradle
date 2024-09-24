@@ -1,5 +1,6 @@
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+apply plugin: 'kotlinx-serialization'
 
 apply from: "${rootDir}/scripts/javadoc.gradle"
 apply from: "${rootDir}/scripts/publishing.gradle"
@@ -135,6 +136,7 @@ dependencies {
 
     androidTestImplementation "junit:junit:$versions.junit"
 
+    testImplementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$versions.kotlin.serialization"
     testImplementation "org.jetbrains.kotlin:kotlin-test:$versions.kotlin.kotlin"
     testImplementation "io.mockk:mockk:$versions.mockk"
 

@@ -17,6 +17,8 @@ package de.prosiebensat1digital.oasisjsbridge
 
 import com.google.common.truth.Truth.assertThat
 import com.google.gson.Gson
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Test
 import kotlin.test.assertEquals
 
@@ -28,7 +30,8 @@ class JsonObjectWrapperTest {
         """{
           "key1": "value1",
           "key2": 2,
-          "key3": ["one", 2]
+          "key3": ["one", 2],
+          "key4": "cause: \"blah\" blah blah"
         }"""
 
     private val keyValuePairs = arrayOf(
@@ -88,13 +91,33 @@ class JsonObjectWrapperTest {
         val pairsWrapper = JsonObjectWrapper(*keyValuePairs)
         val arrayWrapper = JsonObjectWrapper(array)
 
-        assertEquals(undefinedWrapper.toJsString(), "undefined")
-        assertEquals(objectWrapper.toJsString().removeWhiteSpaces(),
-            """JSON.parse("{\"key1\":\"value1\",\"key2\":2,\"key3\":[\"one\",2]}")""")
-        assertEquals(pairsWrapper.toJsString().removeWhiteSpaces(),
-            """JSON.parse("{\"key1\":\"value1\",\"key2\":2,\"key3\":{\"key1\":\"value1\",\"key2\":2,\"key3\":[\"one\",2]},\"key4\":true,\"key5\":false,\"key7\":null}")""")
-        assertEquals(arrayWrapper.toJsString().removeWhiteSpaces(),
-            """JSON.parse("[1,\"three\"]")""")
+        assertThat(undefinedWrapper.toJsString()).isEqualTo("undefined")
+        // verify double quotes are escaped only once
+        assertThat(objectWrapper.toJsString().removeWhiteSpaces()).isEqualTo("""JSON.parse("{\"key1\": \"value1\",\"key2\": 2,\"key3\": [\"one\", 2],\"key4\": \"cause: \"blah\" blah blah\"}")""".removeWhiteSpaces())
+        assertThat(pairsWrapper.toJsString().removeWhiteSpaces()).isEqualTo("""JSON.parse("{\"key1\": \"value1\",\"key2\": 2,\"key3\": {\"key1\": \"value1\", \"key2\": 2, \"key3\": [\"one\", 2], \"key4\": \"cause: \"blah\" blah blah\"},\"key4\": true,\"key5\": false,\"key7\": null}")""".removeWhiteSpaces())
+        assertThat(arrayWrapper.toJsString().removeWhiteSpaces()).isEqualTo("""JSON.parse("[1,\"three\"]")""")
+    }
+
+    @Test
+    fun `verify JsonObject with double quotes gets serialized to correct json format and deserialized the specified Json into an object`() {
+        val expectedJson = """{"errorPayload":{"error":"Error (cause: \"Failed to fetch data\")"}}"""
+
+        // build json representation of `GenericError` type
+        // using `buildJsonObject` because this api internally escapes characters
+        val jsonObject = buildJsonObject {
+            // this will escape double quotes automatically (adding `\` before each double quote character)
+            put("error", "Error (cause: \"Failed to fetch data\")")
+        }
+        val properties: MutableMap<String, Any> = mutableMapOf()
+        properties["errorPayload"] = jsonObject.toString()
+
+        val jsonObjectWrapper = JsonObjectWrapper(properties)
+
+        // deserialize `jsonString` into `GenericError` type - this will result in an exception if something went wrong in our implementation
+        Gson().fromJson(jsonObjectWrapper.jsonString, GenericError::class.java)
+
+        // finally assert that expected JSON String (created using GSON) is same
+        assertThat(jsonObjectWrapper.jsonString).isEqualTo(expectedJson)
     }
 
     @Test
@@ -111,8 +134,11 @@ class JsonObjectWrapperTest {
         assertThat(json).isEqualTo(Gson().toJson(input))
     }
 
-    private fun generateString(length: Int) : String {
+    private fun generateString(length: Int): String {
         val charArray = CharArray(length) { 'X' }
         return String(charArray)
     }
 }
+
+private data class GenericError(val errorPayload: ErrorPayload)
+private data class ErrorPayload(val error: String)

@@ -119,6 +119,10 @@ open class JsonObjectWrapper(val jsonString: String) {
         }
 
         private fun escape(string: String): String {
+            // if its a JSON string starting with '{' && ends with '}' then return same string as we don't want to escape any characters in this case
+            if (string.isNotEmpty() && string.startsWith("{") && string.endsWith("}")) {
+                return string
+            }
             val builder = StringBuilder()
             builder.append('"')
             string.forEach { char ->
@@ -142,8 +146,9 @@ open class JsonObjectWrapper(val jsonString: String) {
         }
         val builder = StringBuilder()
         builder.append("JSON.parse(\"")
-        jsonString.forEach { char ->
+        jsonString.forEachIndexed { index, char ->
             when (char) {
+                '\\' -> if (jsonString.getOrNull(index + 1) == '"') builder.append("") // if already escaped then eat it
                 '"' -> builder.append("\\\"")
                 '\n' -> builder.append(" ")
                 else -> builder.append(char)
